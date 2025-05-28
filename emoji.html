@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Emoji Explorer - Complete List</title>
+    <!-- Bootstrap CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    />
+    <style>
+      body {
+        padding-top: 20px;
+        background-color: #f8f9fa;
+      }
+      h1 {
+        margin-bottom: 20px;
+        text-align: center;
+      }
+      .table th,
+      .table td {
+        vertical-align: middle;
+      }
+      .emoji {
+        font-size: 2rem; /* Ingrossa l'emoji per renderla ben visibile */
+      }
+      .pagination {
+        justify-content: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1 class="text-center">Emoji Explorer</h1>
+      <div class="mb-3">
+        <input
+          type="text"
+          id="searchInput"
+          class="form-control"
+          placeholder="Cerca per nome, codice o emoji..."
+        />
+      </div>
+      <div class="table-responsive">
+        <table class="table table-striped table-bordered">
+          <thead class="table-dark">
+            <tr>
+              <th>Emoji</th>
+              <th>Codice</th>
+              <th>Nome</th>
+            </tr>
+          </thead>
+          <tbody id="emojiTableBody">
+            <!-- Le righe verranno create dinamicamente -->
+          </tbody>
+        </table>
+      </div>
+      <nav>
+        <ul id="pagination" class="pagination"></ul>
+      </nav>
+    </div>
+
+    <!-- Bootstrap Bundle JS (include Popper) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+      /****************************************************
+       * CONFIGURAZIONE E VARIABILI GLOBALI
+       ****************************************************/
+      // URL del dataset emoji offerto da Emojibase (dal pacchetto emojibase-data)
+      const DATA_URL = "https://unpkg.com/emojibase-data@latest/en/data.json";
+      
+      // Variabili globali per memorizzare i dati
+      let emojiData = [];          // L'intero dataset
+      let filteredEmojis = [];     // Dati filtrati in base al campo di ricerca
+      const itemsPerPage = 20;     // Numero di emoji per pagina
+      let currentPage = 1;
+
+      /****************************************************
+       * FUNZIONI DI SUPPORTO: NOME PER REGIONAL INDICATOR
+       ****************************************************/
+      function getRegionalIndicatorName(hexcode) {
+        // I codici per i regional indicator vanno da U+1F1E6 (A) a U+1F1FF (Z)
+        const base = 0x1F1E6;
+        const code = parseInt(hexcode, 16);
+        const offset = code - base;
+        if (offset >= 0 && offset < 26) {
+          const letter = String.fromCharCode(65 + offset);
+          return "Regional Indicator Symbol Letter " + letter;
+        }
+        return "Unknown";
+      }
+      
+      /****************************************************
+       * FUNZIONI DI RENDERIZZAZIONE DELLA TABELLA
+       ****************************************************/
+      function renderTable() {
+        const tbody = document.getElementById("emojiTableBody");
+        tbody.innerHTML = "";
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const pageItems = filteredEmojis.slice(startIndex, startIndex + itemsPerPage);
+        pageItems.forEach(item => {
+          // Scegliamo il codice: usiamo item.hexcode se presente, altrimenti item.unicode
+          const codeStr = item.hexcode || item.unicode || "N/A";
+          const codeText = codeStr !== "N/A" ? "U+" + codeStr.toUpperCase() : "N/A";
+          // Determiniamo il nome:
+          // Se annotation è presente e non vuota, la usiamo.
+          // Altrimenti, se il codice inizia con "1F1" (indicatore regionale), calcoliamo il nome.
+          // Altrimenti, usiamo il primo elemento in "shortcodes" (se presente) o "Unknown".
+          let displayName = "Unknown";
+          if (item.annotation && item.annotation.trim() !== "") {
+            displayName = item.annotation;
+          } else if (codeStr.toUpperCase().startsWith("1F1")) {
+            displayName = getRegionalIndicatorName(codeStr);
+          } else if (item.shortcodes && item.shortcodes.length > 0) {
+            displayName = item.shortcodes[0];
+          }
+          
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td class="emoji">${item.emoji || ""}</td>
+            <td>${codeText}</td>
+            <td>${displayName}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+      
+      /****************************************************
+       * FUNZIONE DI PAGINAZIONE DYNAMIC
+       ****************************************************/
+      function renderPagination() {
+        const pagination = document.getElementById("pagination");
+        pagination.innerHTML = "";
+        const totalPages = Math.ceil(filteredEmojis.length / itemsPerPage);
+        
+        // Bottone "Previous"
+        const liPrev = document.createElement("li");
+        liPrev.className = "page-item" + (currentPage === 1 ? " disabled" : "");
+        const aPrev = document.createElement("a");
+        aPrev.className = "page-link";
+        aPrev.href = "#";
+        aPrev.textContent = "Previous";
+        aPrev.onclick = function(e) {
+          e.preventDefault();
+          if (currentPage > 1) {
+            currentPage--;
+            renderTable();
+            renderPagination();
+          }
+        };
+        liPrev.appendChild(aPrev);
+        pagination.appendChild(liPrev);
+        
+        // Calcolo dinamico della gamma di numeri da mostrare
+        let maxDisplay = 7; // massimo link visibili
+        let startPage = Math.max(1, currentPage - 3);
+        let endPage = Math.min(totalPages, currentPage + 3);
+        if ((endPage - startPage) < maxDisplay - 1) {
+          if (currentPage <= Math.floor(maxDisplay / 2)) {
+            endPage = Math.min(totalPages, maxDisplay);
+          } else if (currentPage > totalPages - Math.floor(maxDisplay / 2)) {
+            startPage = Math.max(1, totalPages - maxDisplay + 1);
+          }
+        }
+        
+        // Se inizia oltre la prima pagina, mostra "1" e poi ellissi
+        if (startPage > 1) {
+          pagination.appendChild(createPageLink(1));
+          if (startPage > 2) {
+            const liEllipsis1 = document.createElement("li");
+            liEllipsis1.className = "page-item disabled";
+            liEllipsis1.innerHTML = `<span class="page-link">...</span>`;
+            pagination.appendChild(liEllipsis1);
+          }
+        }
+        
+        // Numeri centrali
+        for(let i = startPage; i <= endPage; i++){
+          pagination.appendChild(createPageLink(i));
+        }
+        
+        // Se non raggiungiamo l'ultima pagina, mostra ellissi e l'ultima pagina
+        if (endPage < totalPages) {
+          if (endPage < totalPages - 1) {
+            const liEllipsis2 = document.createElement("li");
+            liEllipsis2.className = "page-item disabled";
+            liEllipsis2.innerHTML = `<span class="page-link">...</span>`;
+            pagination.appendChild(liEllipsis2);
+          }
+          pagination.appendChild(createPageLink(totalPages));
+        }
+        
+        // Bottone "Next"
+        const liNext = document.createElement("li");
+        liNext.className = "page-item" + (currentPage === totalPages ? " disabled" : "");
+        const aNext = document.createElement("a");
+        aNext.className = "page-link";
+        aNext.href = "#";
+        aNext.textContent = "Next";
+        aNext.onclick = function(e) {
+          e.preventDefault();
+          if (currentPage < totalPages) {
+            currentPage++;
+            renderTable();
+            renderPagination();
+          }
+        };
+        liNext.appendChild(aNext);
+        pagination.appendChild(liNext);
+      }
+      
+      function createPageLink(pageNumber) {
+        const li = document.createElement("li");
+        li.className = "page-item" + (pageNumber === currentPage ? " active" : "");
+        const a = document.createElement("a");
+        a.className = "page-link";
+        a.href = "#";
+        a.textContent = pageNumber;
+        a.onclick = function(e) {
+          e.preventDefault();
+          currentPage = pageNumber;
+          renderTable();
+          renderPagination();
+        };
+        li.appendChild(a);
+        return li;
+      }
+      
+      /****************************************************
+       * FUNZIONE: FILTRO DI RICERCA IN TEMPO REALE
+       ****************************************************/
+      function applyFilter() {
+        const term = document.getElementById("searchInput").value.trim().toLowerCase();
+        filteredEmojis = emojiData.filter(item =>
+          (item.annotation && item.annotation.toLowerCase().includes(term)) ||
+          (item.hexcode && item.hexcode.toLowerCase().includes(term)) ||
+          (item.unicode && item.unicode.toLowerCase().includes(term)) ||
+          (item.emoji && item.emoji.includes(term)) ||
+          (item.shortcodes && item.shortcodes.some(sn => sn.toLowerCase().includes(term)))
+        );
+        currentPage = 1;
+        renderTable();
+        renderPagination();
+      }
+      
+      document.getElementById("searchInput").addEventListener("input", applyFilter);
+      
+      /****************************************************
+       * CARICAMENTO DEL DATASET EMOJI (JSON)
+       ****************************************************/
+      async function loadEmojiData() {
+        try {
+          const response = await fetch(DATA_URL);
+          if (!response.ok) {
+            throw new Error(`HTTP error: ${response.status}`);
+          }
+          emojiData = await response.json();
+          console.log("Dataset emoji:", emojiData);
+          // Inizialmente, nessun filtro: tutti gli emoji
+          filteredEmojis = emojiData;
+          renderTable();
+          renderPagination();
+          console.log(`Loaded ${emojiData.length} emoji from ${DATA_URL}`);
+        } catch (error) {
+          console.error("Error loading emoji data:", error);
+          document.body.innerHTML = `<div class="container">
+            <div class="alert alert-danger">Error loading emoji data: ${error.message}</div>
+          </div>`;
+        }
+      }
+      
+      loadEmojiData();
+    </script>
+  </body>
+</html>
