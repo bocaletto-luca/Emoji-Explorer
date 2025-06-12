@@ -1,6 +1,8 @@
 # Emoji Explorer | WebApp
 #### Author: Bocaletto Luca
 
+[![Test Online](https://img.shields.io/badge/Test%20Online-Click%20Here-brightgreen?style=for-the-badge)](https://bocaletto-luca.github.io/Emoji-Explorer/)
+
 **Emoji Explorer** is a lightweight web application developed by **Bocaletto Luca** that lets users browse a comprehensive, searchable, and paginated list of emojis. The app displays each emoji along with its corresponding Unicode code and descriptive name. It leverages an open-source dataset from [Emojibase](https://emojibase.dev/) (via unpkg) and is built using HTML, CSS, JavaScript, and Bootstrap.
 
 ---
